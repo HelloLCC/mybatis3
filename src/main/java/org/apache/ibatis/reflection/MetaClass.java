@@ -30,7 +30,7 @@ import org.apache.ibatis.reflection.property.PropertyTokenizer;
  * @author Clinton Begin
  */
 public class MetaClass {
-
+  // 反射器的反射工厂类
   private final ReflectorFactory reflectorFactory;
   private final Reflector reflector;
 

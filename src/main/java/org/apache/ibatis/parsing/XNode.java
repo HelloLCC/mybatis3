@@ -303,6 +303,9 @@ public class XNode {
 
   public Properties getChildrenAsProperties() {
     Properties properties = new Properties();
+    // 获取<property name="" value=""></property>
+    // name 为 key，value 为 value
+    // 构成properties的一个元素
     for (XNode child : getChildren()) {
       String name = child.getStringAttribute("name");
       String value = child.getStringAttribute("value");

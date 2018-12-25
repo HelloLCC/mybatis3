@@ -45,22 +45,31 @@ import org.apache.ibatis.reflection.property.PropertyNamer;
  * @author Clinton Begin
  */
 public class Reflector {
-
+  // 目标类
   private final Class<?> type;
+  // 可读属性名列表
   private final String[] readablePropertyNames;
+  // 可写属性名列表
   private final String[] writeablePropertyNames;
+  // setter方法集合
   private final Map<String, Invoker> setMethods = new HashMap<>();
+  // getter方法集合
   private final Map<String, Invoker> getMethods = new HashMap<>();
+
   private final Map<String, Class<?>> setTypes = new HashMap<>();
   private final Map<String, Class<?>> getTypes = new HashMap<>();
+  // 默认构造函数
   private Constructor<?> defaultConstructor;
 
   private Map<String, String> caseInsensitivePropertyMap = new HashMap<>();
 
   public Reflector(Class<?> clazz) {
     type = clazz;
+    // 反射获取无参构造函数
     addDefaultConstructor(clazz);
+    // 反射获取getter方法
     addGetMethods(clazz);
+    // 反射获取setter方法
     addSetMethods(clazz);
     addFields(clazz);
     readablePropertyNames = getMethods.keySet().toArray(new String[getMethods.keySet().size()]);

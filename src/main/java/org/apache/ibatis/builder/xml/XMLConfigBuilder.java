@@ -67,6 +67,7 @@ public class XMLConfigBuilder extends BaseBuilder {
   }
 
   public XMLConfigBuilder(Reader reader, String environment, Properties props) {
+    // 解析xml文件需要有自定义的EntityResolver
     this(new XPathParser(reader, true, props, new XMLMapperEntityResolver()), environment, props);
   }
 
@@ -96,6 +97,7 @@ public class XMLConfigBuilder extends BaseBuilder {
       throw new BuilderException("Each XMLConfigBuilder can only be used once.");
     }
     parsed = true;
+    // 真正用来解析mybatis全局配置文件的
     parseConfiguration(parser.evalNode("/configuration"));
     return configuration;
   }
@@ -103,8 +105,13 @@ public class XMLConfigBuilder extends BaseBuilder {
   private void parseConfiguration(XNode root) {
     try {
       //issue #117 read properties first
+      // 解析properties标签
       propertiesElement(root.evalNode("properties"));
+
+      // 解析settings配置
       Properties settings = settingsAsProperties(root.evalNode("settings"));
+
+      // 加载vfs[用来和系统交互，方便读取文件]
       loadCustomVfs(settings);
       typeAliasesElement(root.evalNode("typeAliases"));
       pluginElement(root.evalNode("plugins"));
@@ -126,8 +133,10 @@ public class XMLConfigBuilder extends BaseBuilder {
     if (context == null) {
       return new Properties();
     }
+    // settings的子节点也是用key-value方式配置的，所以也是装换为Properties对象
     Properties props = context.getChildrenAsProperties();
     // Check that all settings are known to the configuration class
+    // 使用反射工厂判断settings节点下配置的key是否在Configuration类中有对应的字段
     MetaClass metaConfig = MetaClass.forClass(Configuration.class, localReflectorFactory);
     for (Object key : props.keySet()) {
       if (!metaConfig.hasSetter(String.valueOf(key))) {
@@ -215,22 +224,28 @@ public class XMLConfigBuilder extends BaseBuilder {
 
   private void propertiesElement(XNode context) throws Exception {
     if (context != null) {
+      // 解析properties的子节点property，并将这些节点内容转换为属性对象Properties
       Properties defaults = context.getChildrenAsProperties();
       String resource = context.getStringAttribute("resource");
       String url = context.getStringAttribute("url");
       if (resource != null && url != null) {
         throw new BuilderException("The properties element cannot specify both a URL and a resource based property file reference.  Please specify one or the other.");
       }
+      // 获取<properties resource="" / url=""></properties>
+      // 这些事加载外部的properties
+      // TODO 注意这里是先加载的子节点然后再加载外部资源，所以存在同名覆盖的问题，外部资源会覆盖内部资源
       if (resource != null) {
         defaults.putAll(Resources.getResourceAsProperties(resource));
       } else if (url != null) {
         defaults.putAll(Resources.getUrlAsProperties(url));
       }
+      // 再合并Configuration已经存在的Properties
       Properties vars = configuration.getVariables();
       if (vars != null) {
         defaults.putAll(vars);
       }
       parser.setVariables(defaults);
+      // 解析完毕放到Configuration类中
       configuration.setVariables(defaults);
     }
   }
