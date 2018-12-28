@@ -125,11 +125,16 @@ public class MapperAnnotationBuilder {
 
   public void parse() {
     String resource = type.toString();
+    // 首先判断mapper资源文件是否已经加载过了
     if (!configuration.isResourceLoaded(resource)) {
+      // 加载*mapper.xml资源文件
       loadXmlResource();
+      //
       configuration.addLoadedResource(resource);
       assistant.setCurrentNamespace(type.getName());
+      // 解析cache
       parseCache();
+      // 解析cacheRef
       parseCacheRef();
       Method[] methods = type.getMethods();
       for (Method method : methods) {
@@ -166,6 +171,7 @@ public class MapperAnnotationBuilder {
     // to prevent loading again a resource twice
     // this flag is set at XMLMapperBuilder#bindMapperForNamespace
     if (!configuration.isResourceLoaded("namespace:" + type.getName())) {
+      //
       String xmlResource = type.getName().replace('.', '/') + ".xml";
       // #1347
       InputStream inputStream = type.getResourceAsStream("/" + xmlResource);

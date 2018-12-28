@@ -58,7 +58,9 @@ public class MapperRegistry {
   }
 
   public <T> void addMapper(Class<T> type) {
+    // 必须是接口才能是mapper
     if (type.isInterface()) {
+      // 如果已经注册之后就不会重新注册了，然后会抛出异常
       if (hasMapper(type)) {
         throw new BindingException("Type " + type + " is already known to the MapperRegistry.");
       }
@@ -68,6 +70,7 @@ public class MapperRegistry {
         // It's important that the type is added before the parser is run
         // otherwise the binding may automatically be attempted by the
         // mapper parser. If the type is already known, it won't try.
+        // 这个是来支持注解配置mapper的方式的
         MapperAnnotationBuilder parser = new MapperAnnotationBuilder(config, type);
         parser.parse();
         loadCompleted = true;
@@ -91,9 +94,13 @@ public class MapperRegistry {
    */
   public void addMappers(String packageName, Class<?> superType) {
     ResolverUtil<Class<?>> resolverUtil = new ResolverUtil<>();
+    // 直接去扫描那些包下面的.class结尾的文件，加载到jvm中，然后addIfMatching(superType)
+    // 这就是mybatis的扫包原理，我们可以直接借鉴来开发我们的应用
     resolverUtil.find(new ResolverUtil.IsA(superType), packageName);
+    // 获取这个包下面所有的目标类的Class对象
     Set<Class<? extends Class<?>>> mapperSet = resolverUtil.getClasses();
     for (Class<?> mapperClass : mapperSet) {
+      // 添加到mapperRegistry中
       addMapper(mapperClass);
     }
   }

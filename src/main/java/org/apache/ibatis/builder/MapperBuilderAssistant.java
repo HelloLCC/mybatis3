@@ -109,10 +109,13 @@ public class MapperBuilderAssistant extends BaseBuilder {
     }
     try {
       unresolvedCacheRef = true;
+      // TODO ? 这里跟spring的不太一样啊，当ref namespace没有加载的时候还是要抛出异常的吗？
+      // 答：在上一层会抓到这个异常，然后把它添加到未完成的解析缓存中
       Cache cache = configuration.getCache(namespace);
       if (cache == null) {
         throw new IncompleteElementException("No cache for namespace '" + namespace + "' could be found.");
       }
+      // 从这里可以看到当使用cache-ref标签的时候多个mapper是可以共享同一个缓存的
       currentCache = cache;
       unresolvedCacheRef = false;
       return cache;
@@ -137,6 +140,7 @@ public class MapperBuilderAssistant extends BaseBuilder {
         .blocking(blocking)
         .properties(props)
         .build();
+    // 把cache添加到Configuration实例中，id为mapper的namepace的值
     configuration.addCache(cache);
     currentCache = cache;
     return cache;

@@ -152,15 +152,19 @@ public class Configuration {
     protected final LanguageDriverRegistry languageRegistry = new LanguageDriverRegistry();
 
     protected final Map<String, MappedStatement> mappedStatements = new StrictMap<>("Mapped Statements collection");
+    // 缓存的注册，key为mapper中的namespace，value为缓存的实例引用
     protected final Map<String, Cache> caches = new StrictMap<>("Caches collection");
     protected final Map<String, ResultMap> resultMaps = new StrictMap<>("Result Maps collection");
     protected final Map<String, ParameterMap> parameterMaps = new StrictMap<>("Parameter Maps collection");
     protected final Map<String, KeyGenerator> keyGenerators = new StrictMap<>("Key Generators collection");
 
+    // 保存已经加载过的Mapper.xml文件
     protected final Set<String> loadedResources = new HashSet<>();
+    // 缓存
     protected final Map<String, XNode> sqlFragments = new StrictMap<>("XML fragments parsed from previous mappers");
 
     protected final Collection<XMLStatementBuilder> incompleteStatements = new LinkedList<>();
+    // 没有解析完成的cacheRef缓存，因为mapper的顺序不确定，可能在解析ref-namespace的时候，引用的那个还没有解析，所以先放到未完成的缓存中
     protected final Collection<CacheRefResolver> incompleteCacheRefs = new LinkedList<>();
     protected final Collection<ResultMapResolver> incompleteResultMaps = new LinkedList<>();
     protected final Collection<MethodResolver> incompleteMethods = new LinkedList<>();
@@ -170,6 +174,7 @@ public class Configuration {
      * references a cache bound to another namespace and the value is the
      * namespace which the actual cache is bound to.
      */
+    // cacheRef的解析缓存
     protected final Map<String, String> cacheRefMap = new HashMap<>();
 
     public Configuration(Environment environment) {

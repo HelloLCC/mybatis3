@@ -86,6 +86,7 @@ public class ClassLoaderWrapper {
    * @throws ClassNotFoundException Duh.
    */
   public Class<?> classForName(String name) throws ClassNotFoundException {
+    // TODO 关键在于这个getClassloaders(null)方法
     return classForName(name, getClassLoaders(null));
   }
 
@@ -176,7 +177,7 @@ public class ClassLoaderWrapper {
    * @throws ClassNotFoundException - Remember the wisdom of Judge Smails: Well, the world needs ditch diggers, too.
    */
   Class<?> classForName(String name, ClassLoader[] classLoader) throws ClassNotFoundException {
-
+    // 然后这里就可以看到依次使用类前面获取的类加载器进行加载，数组也确保了加载顺序
     for (ClassLoader cl : classLoader) {
 
       if (null != cl) {
@@ -202,6 +203,12 @@ public class ClassLoaderWrapper {
   }
 
   ClassLoader[] getClassLoaders(ClassLoader classLoader) {
+    // TODO 从中可以窥探mybatis的类加载机制
+    // 1.首先使用指定的类加载器classLoader，但是调用的时候基本上是null
+    // 2.使用默认的类加载器defaultClassLoader，但是跟踪CLassLoaderWrapper类在追踪defaultClassLoader的setter方法看到也是只有测试类设置过，所以一般也是null
+    // 3.然后就是ContextClassLoader了，这个就不陌生了，在tomcat中启动这个的时候tomcat设置Thread.currentThread().setContextClassLoader(catalinaLoader)，这个目的是为了打破双亲委派模型的
+    // 4.当前类的classloader
+    // 5.最后就是系统类加载器了systemClassLoader，这个看过jvm的类加载机制应该就不陌生了
     return new ClassLoader[]{
         classLoader,
         defaultClassLoader,

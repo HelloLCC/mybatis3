@@ -90,6 +90,7 @@ public class XMLMapperBuilder extends BaseBuilder {
 
   public void parse() {
     if (!configuration.isResourceLoaded(resource)) {
+      // 解析根节点
       configurationElement(parser.evalNode("/mapper"));
       configuration.addLoadedResource(resource);
       bindMapperForNamespace();
@@ -106,14 +107,20 @@ public class XMLMapperBuilder extends BaseBuilder {
 
   private void configurationElement(XNode context) {
     try {
+      // 获取<mapper namespace="namespaceName">的namespace属性
       String namespace = context.getStringAttribute("namespace");
       if (namespace == null || namespace.equals("")) {
         throw new BuilderException("Mapper's namespace cannot be empty");
       }
+      // 设置当前解析的namespace
       builderAssistant.setCurrentNamespace(namespace);
+      // 解析cache-ref属性
       cacheRefElement(context.evalNode("cache-ref"));
+      // 解析cache属性
       cacheElement(context.evalNode("cache"));
+      // 这个不常用了
       parameterMapElement(context.evalNodes("/mapper/parameterMap"));
+      // 解析返回类型
       resultMapElements(context.evalNodes("/mapper/resultMap"));
       sqlElement(context.evalNodes("/mapper/sql"));
       buildStatementFromContext(context.evalNodes("select|insert|update|delete"));
@@ -192,6 +199,7 @@ public class XMLMapperBuilder extends BaseBuilder {
       try {
         cacheRefResolver.resolveCacheRef();
       } catch (IncompleteElementException e) {
+        // 如果ref的那个Cache还没有初始化，就放在未完成的缓存中
         configuration.addIncompleteCacheRef(cacheRefResolver);
       }
     }
@@ -199,15 +207,21 @@ public class XMLMapperBuilder extends BaseBuilder {
 
   private void cacheElement(XNode context) throws Exception {
     if (context != null) {
+      // 获取缓存实现类，默认是PERPETUAL
       String type = context.getStringAttribute("type", "PERPETUAL");
+      // mybatis中所有的类型都可以有别名，所以先解析是不是别名，然后再进行类加载
       Class<? extends Cache> typeClass = typeAliasRegistry.resolveAlias(type);
+      // 读取缓存淘汰策略，默认LRU
       String eviction = context.getStringAttribute("eviction", "LRU");
+      // 同样是别名也是类型
       Class<? extends Cache> evictionClass = typeAliasRegistry.resolveAlias(eviction);
+      // 解析缓存刷新的时间
       Long flushInterval = context.getLongAttribute("flushInterval");
       Integer size = context.getIntAttribute("size");
       boolean readWrite = !context.getBooleanAttribute("readOnly", false);
       boolean blocking = context.getBooleanAttribute("blocking", false);
       Properties props = context.getChildrenAsProperties();
+      // 为当前mapper设置一个自己的Cache，但是生命周期是整个namespace，所以这是二级缓存，而且是在SQLSessionFactory级别的缓存共享
       builderAssistant.useNewCache(typeClass, evictionClass, flushInterval, size, readWrite, blocking, props);
     }
   }
@@ -255,24 +269,42 @@ public class XMLMapperBuilder extends BaseBuilder {
 
   private ResultMap resultMapElement(XNode resultMapNode, List<ResultMapping> additionalResultMappings, Class<?> enclosingType) throws Exception {
     ErrorContext.instance().activity("processing " + resultMapNode.getValueBasedIdentifier());
+    // <resultMap id="a" type="" autoMapping="NONE | PARTIAL | FULL">
     String id = resultMapNode.getStringAttribute("id",
         resultMapNode.getValueBasedIdentifier());
     String type = resultMapNode.getStringAttribute("type",
         resultMapNode.getStringAttribute("ofType",
             resultMapNode.getStringAttribute("resultType",
                 resultMapNode.getStringAttribute("javaType"))));
+
     String extend = resultMapNode.getStringAttribute("extends");
     Boolean autoMapping = resultMapNode.getBooleanAttribute("autoMapping");
+    // 自己加载class文件
     Class<?> typeClass = resolveClass(type);
     if (typeClass == null) {
       typeClass = inheritEnclosingType(resultMapNode, enclosingType);
     }
     Discriminator discriminator = null;
+
     List<ResultMapping> resultMappings = new ArrayList<>();
     resultMappings.addAll(additionalResultMappings);
     List<XNode> resultChildren = resultMapNode.getChildren();
+    // 遍历所有的子节点
+    // <constructor>
+    //   <idArg/>
+    //   <arg/>
+    // </constructor>
+    // <id>
+    // <result/>
+    // <association>
+    // <collection>
+    // <discriminator>
+    //   <case>
+    //   </case>
+    // </discriminator>
     for (XNode resultChild : resultChildren) {
       if ("constructor".equals(resultChild.getName())) {
+        // 解析constructor标签
         processConstructorElement(resultChild, typeClass, resultMappings);
       } else if ("discriminator".equals(resultChild.getName())) {
         discriminator = processDiscriminatorElement(resultChild, typeClass, resultMappings);

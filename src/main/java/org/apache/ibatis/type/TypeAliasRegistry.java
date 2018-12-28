@@ -36,10 +36,11 @@ import org.apache.ibatis.io.Resources;
  * @author Clinton Begin
  */
 public class TypeAliasRegistry {
-
+  // mybatis的别名注册表，跟spring-bean的很累是，在spring中是AliasRegistry，异曲同工
   private final Map<String, Class<?>> TYPE_ALIASES = new HashMap<>();
 
   public TypeAliasRegistry() {
+    // 这里是mybatis把Java的基本数据类型、以及包装类型、基本数组类型、包装数组类型etc.都进行了重命名
     registerAlias("string", String.class);
 
     registerAlias("byte", Byte.class);
@@ -111,8 +112,10 @@ public class TypeAliasRegistry {
       String key = string.toLowerCase(Locale.ENGLISH);
       Class<T> value;
       if (TYPE_ALIASES.containsKey(key)) {
+        // 如果在缓存中能找到就不用显示的去调用这些类的类加载方法了，因为这些都是jdk自带的是公用的，也不存在jar包隔离的问题
         value = (Class<T>) TYPE_ALIASES.get(key);
       } else {
+        // TODO 这个里面才真正的体现mybatis类加载机制的地方
         value = (Class<T>) Resources.classForName(string);
       }
       return value;
@@ -121,12 +124,18 @@ public class TypeAliasRegistry {
     }
   }
 
+  /**
+   * 这个方法就是解决<typeAliases><package name="packageName" /></><typeAliases/>类型配置的
+   * @param packageName
+   */
   public void registerAliases(String packageName){
     registerAliases(packageName, Object.class);
   }
 
   public void registerAliases(String packageName, Class<?> superType){
+    // 这个ResolverUtil就是mybatis用来扫描包下所有的类的工具类
     ResolverUtil<Class<?>> resolverUtil = new ResolverUtil<>();
+    // 这句代码的意思是：
     resolverUtil.find(new ResolverUtil.IsA(superType), packageName);
     Set<Class<? extends Class<?>>> typeSet = resolverUtil.getClasses();
     for(Class<?> type : typeSet){
@@ -139,7 +148,9 @@ public class TypeAliasRegistry {
   }
 
   public void registerAlias(Class<?> type) {
+    // 这个就是用来生成默认名字的方法
     String alias = type.getSimpleName();
+    // 这里会处理Alias标签
     Alias aliasAnnotation = type.getAnnotation(Alias.class);
     if (aliasAnnotation != null) {
       alias = aliasAnnotation.value();
@@ -152,6 +163,7 @@ public class TypeAliasRegistry {
       throw new TypeException("The parameter alias cannot be null");
     }
     // issue #748
+    // 所以这里就能看到手动注册的是大小写不敏感的，但是在初始化的时候自动注册的那些别名是大小写敏感的
     String key = alias.toLowerCase(Locale.ENGLISH);
     if (TYPE_ALIASES.containsKey(key) && TYPE_ALIASES.get(key) != null && !TYPE_ALIASES.get(key).equals(value)) {
       throw new TypeException("The alias '" + alias + "' is already mapped to the value '" + TYPE_ALIASES.get(key).getName() + "'.");

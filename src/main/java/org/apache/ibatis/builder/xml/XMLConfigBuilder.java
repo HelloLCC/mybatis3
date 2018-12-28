@@ -111,18 +111,29 @@ public class XMLConfigBuilder extends BaseBuilder {
       // 解析settings配置
       Properties settings = settingsAsProperties(root.evalNode("settings"));
 
-      // 加载vfs[用来和系统交互，方便读取文件]
+      // 加载vfs[用来和系统交互，方便读取文件]、其实也没有找到默认情况下有setter的地方
       loadCustomVfs(settings);
+      // 解析typeAliases标签
+      // 其实这里的别名只能是对Java类的别名，不能是其他的
       typeAliasesElement(root.evalNode("typeAliases"));
+      // 解析plugins标签
+      // mybatis提供了plugins的拓展机制，通过插件允许我们在SQL的执行过程中的某点上做一些自定义操作
+      // 实现一个插件需要让插件类实现Interceptor接口，然后在插件类上添加@Intercepts和@Signature注解，用于指定想要拦截的目标方法
       pluginElement(root.evalNode("plugins"));
+      // 解析objectFactory
       objectFactoryElement(root.evalNode("objectFactory"));
+      // 解析objectWrapperFactory
       objectWrapperFactoryElement(root.evalNode("objectWrapperFactory"));
+      // 解析反射工厂reflectorFactory，这里面设置的反射工厂其实在解析typeAlias标签的时候没有用到
       reflectorFactoryElement(root.evalNode("reflectorFactory"));
+      // 设置解析出来的settings属性到Configuration.class中
       settingsElement(settings);
       // read it after objectFactory and objectWrapperFactory issue #631
       environmentsElement(root.evalNode("environments"));
       databaseIdProviderElement(root.evalNode("databaseIdProvider"));
+      // 解析typeHandler标签
       typeHandlerElement(root.evalNode("typeHandlers"));
+      // TODO 最重要的解析的点
       mapperElement(root.evalNode("mappers"));
     } catch (Exception e) {
       throw new BuilderException("Error parsing SQL Mapper Configuration. Cause: " + e, e);
@@ -137,8 +148,10 @@ public class XMLConfigBuilder extends BaseBuilder {
     Properties props = context.getChildrenAsProperties();
     // Check that all settings are known to the configuration class
     // 使用反射工厂判断settings节点下配置的key是否在Configuration类中有对应的字段
+    // 其实MetaClass就是一个Class对应元数据信息，包含RefactorFactory和Refactor[它里面有class类型]
     MetaClass metaConfig = MetaClass.forClass(Configuration.class, localReflectorFactory);
     for (Object key : props.keySet()) {
+      // 然后判断<settings></settings>标签下面配置的key-value的key是不是在Configuration.class中有相应的setter方法
       if (!metaConfig.hasSetter(String.valueOf(key))) {
         throw new BuilderException("The setting " + key + " is not known.  Make sure you spelled it correctly (case sensitive).");
       }
@@ -149,11 +162,15 @@ public class XMLConfigBuilder extends BaseBuilder {
   private void loadCustomVfs(Properties props) throws ClassNotFoundException {
     String value = props.getProperty("vfsImpl");
     if (value != null) {
+      // 从这里可以看到vfs的实现类可以配置多个以","分割
       String[] clazzes = value.split(",");
       for (String clazz : clazzes) {
         if (!clazz.isEmpty()) {
+          // 这里同样是显示的去加载这些类
           @SuppressWarnings("unchecked")
           Class<? extends VFS> vfsImpl = (Class<? extends VFS>)Resources.classForName(clazz);
+          // 然后设置到Configuration::USER_IMPLEMENTATIONS[List类型的]变量中
+          // 什么时候使用还真是不知道
           configuration.setVfsImpl(vfsImpl);
         }
       }
@@ -161,19 +178,29 @@ public class XMLConfigBuilder extends BaseBuilder {
   }
 
   private void typeAliasesElement(XNode parent) {
+    // <typeAliases>
+    //   <package name="packageName"/>
+    //   <typeAlias alias="aliasName" type="className"/>
+    // </typeAliases>
     if (parent != null) {
       for (XNode child : parent.getChildren()) {
         if ("package".equals(child.getName())) {
+          // 第一种，如果配置的是package标签
+          // mybatis获取扫描这个包下的所有类，为所有的类生成默认的aliasName，现在我们可以通过打@Alias("aaa")注解来实现自定义别名了
           String typeAliasPackage = child.getStringAttribute("name");
           configuration.getTypeAliasRegistry().registerAliases(typeAliasPackage);
         } else {
+          // 第二种，如果配置的是<typeAlias>标签
           String alias = child.getStringAttribute("alias");
           String type = child.getStringAttribute("type");
           try {
+            // 首先加载这个类，如果没找到会抛出异常的
             Class<?> clazz = Resources.classForName(type);
             if (alias == null) {
+              // 如果别名为空，那就生成默认的别名
               typeAliasRegistry.registerAlias(clazz);
             } else {
+              // 直接注册
               typeAliasRegistry.registerAlias(alias, clazz);
             }
           } catch (ClassNotFoundException e) {
@@ -187,10 +214,14 @@ public class XMLConfigBuilder extends BaseBuilder {
   private void pluginElement(XNode parent) throws Exception {
     if (parent != null) {
       for (XNode child : parent.getChildren()) {
+        // 获取插件类的名字，但是可能是alias
         String interceptor = child.getStringAttribute("interceptor");
+        // 获取的是插件的配置信息
         Properties properties = child.getChildrenAsProperties();
+        // 通过插件的class对象的newInstance()方法获取插件的实例
         Interceptor interceptorInstance = (Interceptor) resolveClass(interceptor).newInstance();
         interceptorInstance.setProperties(properties);
+        // 把插件调价到Configuration对象中
         configuration.addInterceptor(interceptorInstance);
       }
     }
@@ -251,6 +282,7 @@ public class XMLConfigBuilder extends BaseBuilder {
   }
 
   private void settingsElement(Properties props) throws Exception {
+    // 硬编码设置Configuration.class的可配置的成员变量，当没有配置的时候，赋以默认值
     configuration.setAutoMappingBehavior(AutoMappingBehavior.valueOf(props.getProperty("autoMappingBehavior", "PARTIAL")));
     configuration.setAutoMappingUnknownColumnBehavior(AutoMappingUnknownColumnBehavior.valueOf(props.getProperty("autoMappingUnknownColumnBehavior", "NONE")));
     configuration.setCacheEnabled(booleanValueOf(props.getProperty("cacheEnabled"), true));
@@ -280,23 +312,30 @@ public class XMLConfigBuilder extends BaseBuilder {
     @SuppressWarnings("unchecked")
     Class<? extends Log> logImpl = (Class<? extends Log>)resolveClass(props.getProperty("logImpl"));
     configuration.setLogImpl(logImpl);
+    // TODO 从这里的resolveClass(String className)你就可以看到mybatis的类加载机制
     configuration.setConfigurationFactory(resolveClass(props.getProperty("configurationFactory")));
   }
 
   private void environmentsElement(XNode context) throws Exception {
     if (context != null) {
       if (environment == null) {
+        // 解析默认环境
         environment = context.getStringAttribute("default");
       }
       for (XNode child : context.getChildren()) {
+        // 获取环境配置的id
         String id = child.getStringAttribute("id");
         if (isSpecifiedEnvironment(id)) {
+          // 解析事务管理器
           TransactionFactory txFactory = transactionManagerElement(child.evalNode("transactionManager"));
+          // 解析DataSource标签
           DataSourceFactory dsFactory = dataSourceElement(child.evalNode("dataSource"));
           DataSource dataSource = dsFactory.getDataSource();
+          // 构建出环境实例
           Environment.Builder environmentBuilder = new Environment.Builder(id)
               .transactionFactory(txFactory)
               .dataSource(dataSource);
+          // 但是看到这里，在配置多个environment之后，设置到Configuration中的是最后一个
           configuration.setEnvironment(environmentBuilder.build());
         }
       }
@@ -324,8 +363,11 @@ public class XMLConfigBuilder extends BaseBuilder {
 
   private TransactionFactory transactionManagerElement(XNode context) throws Exception {
     if (context != null) {
+      // 这里获取的可能是事务管理器的alias
       String type = context.getStringAttribute("type");
+      // 获取配置的property
       Properties props = context.getChildrenAsProperties();
+      // 创建事务管理器的实例
       TransactionFactory factory = (TransactionFactory) resolveClass(type).newInstance();
       factory.setProperties(props);
       return factory;
@@ -348,6 +390,10 @@ public class XMLConfigBuilder extends BaseBuilder {
     if (parent != null) {
       for (XNode child : parent.getChildren()) {
         if ("package".equals(child.getName())) {
+          // 第一种方式：package
+          // <typeHandlers>
+          //   <package name="packageName"/>
+          // </typeHandlers>
           String typeHandlerPackage = child.getStringAttribute("name");
           typeHandlerRegistry.register(typeHandlerPackage);
         } else {
@@ -375,23 +421,36 @@ public class XMLConfigBuilder extends BaseBuilder {
     if (parent != null) {
       for (XNode child : parent.getChildren()) {
         if ("package".equals(child.getName())) {
+          // 解析<mappers package="packageName">
+          // 解析package方式配置的mapper
           String mapperPackage = child.getStringAttribute("name");
+          // 扫描的方式添加mapper，和 MapperProxyFactory
           configuration.addMappers(mapperPackage);
         } else {
+          // 解析<mappers>
+          //      <mapper resource="org/mybatis/builder/AuthorMapper.xml"/>
+          //      <mapper url="file:///var/mappers/AuthorMapper.xml"/>
+          //      <mapper class="org.mybatis.builder.AuthorMapper"/>
+          //      <package name="org.mybatis.builder"/>
+          //    </mappers>
           String resource = child.getStringAttribute("resource");
           String url = child.getStringAttribute("url");
           String mapperClass = child.getStringAttribute("class");
           if (resource != null && url == null && mapperClass == null) {
+            // 解析配置方法为：<mapper resource="org/mybatis/builder/AuthorMapper.xml"/>
             ErrorContext.instance().resource(resource);
             InputStream inputStream = Resources.getResourceAsStream(resource);
+            // 初始化xml解析器
             XMLMapperBuilder mapperParser = new XMLMapperBuilder(inputStream, configuration, resource, configuration.getSqlFragments());
             mapperParser.parse();
           } else if (resource == null && url != null && mapperClass == null) {
+            // 解析配置方法为：<mapper url="file:///var/mappers/AuthorMapper.xml"/>
             ErrorContext.instance().resource(url);
             InputStream inputStream = Resources.getUrlAsStream(url);
             XMLMapperBuilder mapperParser = new XMLMapperBuilder(inputStream, configuration, url, configuration.getSqlFragments());
             mapperParser.parse();
           } else if (resource == null && url == null && mapperClass != null) {
+            // 解析配置方法为：<mapper class="org.mybatis.builder.AuthorMapper"/>
             Class<?> mapperInterface = Resources.classForName(mapperClass);
             configuration.addMapper(mapperInterface);
           } else {

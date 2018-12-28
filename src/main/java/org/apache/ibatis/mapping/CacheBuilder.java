@@ -89,24 +89,32 @@ public class CacheBuilder {
     return this;
   }
 
+  /**
+   * 这里真的是包装器模式的经典实现了，最佳实战，mybatis的代码中很多都是我们需要借鉴的
+   */
   public Cache build() {
+    // 真正的去构建一个Cache
     setDefaultImplementations();
     Cache cache = newBaseCacheInstance(implementation, id);
     setCacheProperties(cache);
     // issue #352, do not apply decorators to custom caches
+    // 可见自定义的Cache是不会去装饰的
     if (PerpetualCache.class.equals(cache.getClass())) {
       for (Class<? extends Cache> decorator : decorators) {
+        // 设置cache的装饰类
         cache = newCacheDecoratorInstance(decorator, cache);
         setCacheProperties(cache);
       }
       cache = setStandardDecorators(cache);
     } else if (!LoggingCache.class.isAssignableFrom(cache.getClass())) {
+      // 这里就是包装器模式，通过包装可以让cache具有日志打印的功能
       cache = new LoggingCache(cache);
     }
     return cache;
   }
 
   private void setDefaultImplementations() {
+    // 设置Cache默认的实现
     if (implementation == null) {
       implementation = PerpetualCache.class;
       if (decorators.isEmpty()) {
@@ -116,18 +124,22 @@ public class CacheBuilder {
   }
 
   private Cache setStandardDecorators(Cache cache) {
+    // 触发这个的时候就是默认的LRUcache了，然后需要进行同步包装，这里有事包装器设计模式的最佳实践
     try {
       MetaObject metaCache = SystemMetaObject.forObject(cache);
       if (size != null && metaCache.hasSetter("size")) {
         metaCache.setValue("size", size);
       }
       if (clearInterval != null) {
+        // 如果没有设置刷新时间间隔用默认的包装
         cache = new ScheduledCache(cache);
         ((ScheduledCache) cache).setClearInterval(clearInterval);
       }
       if (readWrite) {
+        // 设置Cache可读可写
         cache = new SerializedCache(cache);
       }
+      // 简单来说，就是根据不同的配置进行不同的包装，没有配置的进行默认的包装
       cache = new LoggingCache(cache);
       cache = new SynchronizedCache(cache);
       if (blocking) {
@@ -141,10 +153,12 @@ public class CacheBuilder {
 
   private void setCacheProperties(Cache cache) {
     if (properties != null) {
+      // 通过反射获取类的元数据信息
       MetaObject metaCache = SystemMetaObject.forObject(cache);
       for (Map.Entry<Object, Object> entry : properties.entrySet()) {
         String name = (String) entry.getKey();
         String value = (String) entry.getValue();
+        // 然后通过反射调用setter方法设置对应的property
         if (metaCache.hasSetter(name)) {
           Class<?> type = metaCache.getSetterType(name);
           if (String.class == type) {
@@ -187,6 +201,7 @@ public class CacheBuilder {
   }
 
   private Cache newBaseCacheInstance(Class<? extends Cache> cacheClass, String id) {
+    // 反射构造出Cache的实例
     Constructor<? extends Cache> cacheConstructor = getBaseCacheConstructor(cacheClass);
     try {
       return cacheConstructor.newInstance(id);

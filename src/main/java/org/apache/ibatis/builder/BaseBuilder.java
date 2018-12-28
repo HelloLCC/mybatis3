@@ -113,6 +113,7 @@ public abstract class BaseBuilder {
       return null;
     }
     try {
+      // 因为mybatis把基本类型进行了重命名，所以先从别名中解析Class类型
       return resolveAlias(alias);
     } catch (Exception e) {
       throw new BuilderException("Error resolving class. Cause: " + e, e);

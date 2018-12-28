@@ -22,7 +22,7 @@ public class DefaultReflectorFactory implements ReflectorFactory {
   // 是否允许cache反射信息
   private boolean classCacheEnabled = true;
   // 目标类和反射器的映射缓存
-
+  // 为什么要进行缓存呢，因为在Refactor::new的过程中，会反射进行class的元数据信息的获取，缓存起来复用用来提高性能
   private final ConcurrentMap<Class<?>, Reflector> reflectorMap = new ConcurrentHashMap<>();
 
   public DefaultReflectorFactory() {

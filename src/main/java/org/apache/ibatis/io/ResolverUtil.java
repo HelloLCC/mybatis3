@@ -217,6 +217,10 @@ public class ResolverUtil<T> {
     String path = getPackagePath(packageName);
 
     try {
+      // 这个地方你就可以看到VFS的作用了
+      // 我们在loadCustomVfs的时候虽然设置的为空，但是在VFS类中为我们提供了两种默认实现JBoss6VFS.class, DefaultVFS.class
+      // 方便我们与本地机器的文件系统交互，通过这个获取一个vfs的实例和操作系统打交道
+      // 扫描这个包下面的所有的以.class结尾的类，然后判断时候和设置的Test里面的类型也就是Object匹配，匹配就添加进matchs Set里面
       List<String> children = VFS.getInstance().list(path);
       for (String child : children) {
         if (child.endsWith(".class")) {
